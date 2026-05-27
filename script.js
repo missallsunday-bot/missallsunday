@@ -212,7 +212,7 @@ function generateKodeVerifikasi() {
   }
   
   // Email format: username@missallsunday.com
-  const email = username.toUpperCase() + '@missallsunday.com';
+  const email = username.toLowerCase() + '@missallsunday.com';
   
   // Show loading
   document.getElementById('loginBtn').classList.add('login-loading');
