@@ -1,3 +1,23 @@
+const firebaseConfig = {
+  apiKey: "AIzaSyAjID6n-PT7n3q59oe3YTkFDV--R35M9z0",
+  authDomain: "missallssunday.firebaseapp.com",
+  projectId: "missallssunday",
+  storageBucket: "missallssunday.firebasestorage.app",
+  messagingSenderId: "1069694674903",
+  appId: "1:1069694674903:web:81db51f3d008d52ef68d92"
+};
+// =====================================
+// 👆👆👆 ISI DENGAN KONFIGURASI FIREBASE ANDA 👆👆👆
+// =====================================
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// Current user email (untuk database)
+let currentUserEmail = '';
+
 function generateKodeVerifikasi() {
             return Math.floor(10000 + Math.random() * 90000).toString();
         }
@@ -173,144 +193,146 @@ function generateKodeVerifikasi() {
             /* Jangan dipanggil otomatis */
         }
         function login() {
-            const idInput = document.getElementById('loginId').value.trim();
-            const passwordInput = document.getElementById('loginPassword').value.trim();
-            const kodeVerif = document.getElementById('kodeVerif').value.trim();
-
-            // DEBUG: Tampilkan kode yang dibandingkan
-            console.log('🔍 INPUT KODE:', kodeVerif);
-            console.log('🔍 GLOBAL KODE:', kodeVerifikasiGlobal);
-
-            if (!idInput || !passwordInput || !kodeVerif) {
-                alert('Masukkan username, password dan kode verifikasi!');
-                return;
+  const username = document.getElementById('loginId').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  const kodeVerif = document.getElementById('kodeVerif').value.trim();
+  
+  // Cek kode verifikasi
+  if (kodeVerif.toUpperCase() !== kodeVerifikasiGlobal.toUpperCase()) {
+    alert('Kode verifikasi SALAH! Coba lagi.\n\nKode yang benar: ' + kodeVerifikasiGlobal);
+    kodeVerifikasiGlobal = generateKodeVerifikasi();
+    document.getElementById('kodeVerif').value = '';
+    document.getElementById('kodeDisplay').textContent = kodeVerifikasiGlobal;
+    return;
+  }
+  
+  if (!username || !password || !kodeVerif) {
+    alert('Masukkan username, password dan kode verifikasi!');
+    return;
+  }
+  
+  // Email format: username@missallsunday.com
+  const email = username.toUpperCase() + '@missallsunday.com';
+  
+  // Show loading
+  document.getElementById('loginBtn').classList.add('login-loading');
+  
+  // Login dengan Firebase
+  auth.signInWithEmailAndPassword(email, password)
+    .then((userCredential) => {
+      const user = userCredential.user;
+      currentUserEmail = user.email; // Simpan email
+      
+      // Get user data dari Firestore
+      db.collection('users').doc(user.uid).get()
+        .then((doc) => {
+          if (doc.exists) {
+            const userData = doc.data();
+            
+            // Simpan current user
+            localStorage.setItem('currentUser', JSON.stringify({
+              uid: user.uid,
+              username: username.toUpperCase(),
+              nama: userData.nama || username.toUpperCase(),
+              role: userData.role || 'user'
+            }));
+            
+            // Hide login → Show app
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'block';
+            
+            // Update header title
+            const headerTitle = document.querySelector('.header-title');
+            if (headerTitle) {
+              headerTitle.textContent = (userData.nama || username).toUpperCase() + ' | ' + (userData.role || 'USER').toUpperCase();
             }
-
-            // 🔄 BANDINGKAN DENGAN CASE INSENSITIVE & TRIM
-            if (kodeVerif.toUpperCase() !== kodeVerifikasiGlobal.toUpperCase()) {
-                alert('Kode verifikasi SALAH! Coba lagi.\n\nKode yang benar: ' + kodeVerifikasiGlobal);
-                kodeVerifikasiGlobal = generateKodeVerifikasi();
-                document.getElementById('kodeVerif').value = '';
-                document.getElementById('kodeDisplay').textContent = kodeVerifikasiGlobal;
-                return;
+            
+            // Start app
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            loadAppData(); // Load dari Firebase
+            
+            if (userData.role === 'superadmin') {
+              showUserManagement();
             }
-
-            initUserDatabaseFIX();
-            const user = validateLogin(idInput, passwordInput);
-
-            if (user) {
-                // ==== CEK MASA AKTIF UNTUK USER ====
-                if (user.role === 'user') {
-                    const createdDate = new Date(user.createdAt);
-                    // ✅ 30 HARI = 30 * 24 * 60 * 60 * 1000
-                    const expiredDate = new Date(createdDate.getTime() + (30 * 24 * 60 * 60 * 1000));
-                    const now = new Date();
-                    const sisaHari = Math.ceil((expiredDate - now) / (1000 * 60 * 60 * 24));
-
-                    // ✅ PAKE VARIABEL YANG BENAR: sisaHari
-                    if (sisaHari <= 0) {
-                        // Nonaktifkan akun
-                        user.active = false;
-                        // Update di database
-                        const users = JSON.parse(localStorage.getItem('userDatabase') || '[]');
-                        const userIdx = users.findIndex(u => u.username === user.username);
-                        if (userIdx !== -1) {
-                            users[userIdx].active = false;
-                            localStorage.setItem('userDatabase', JSON.stringify(users));
-                        }
-                        alert('⚠️ LAKUKAN PEMBAYARAN SISTEM.\n\nMasa aktif akun telah habis.\n\nSilakan hubungi ADMIN untuk perpanjang.');
-                        return;
-                    }
-
-                    // TAMPILKAN SISA WAKTU (DEBUG)
-                    console.log('⏱️ Sisa masa aktif: ' + sisaHari + ' hari');
-                }
-                // ================================
-
-                localStorage.setItem('currentUser', JSON.stringify(user));
-
-                document.getElementById('loginContainer').style.display = 'none';
-                document.getElementById('appContainer').style.display = 'block';
-
-                const headerTitle = document.querySelector('.header-title');
-                if (headerTitle) {
-                    const namaUser = user.nama ? user.nama.toUpperCase() : user.username.toUpperCase();
-                    const roleUser = user.role.toUpperCase();
-                    headerTitle.textContent = namaUser + ' | ' + roleUser;
-                }
-
-                updateDateTime();
-                setInterval(updateDateTime, 1000);
-                loadAppData();
-
-                if (user.role === 'superadmin') {
-                    showUserManagement();
-                }
-
-                kodeVerifikasiGlobal = generateKodeVerifikasi();
-
-            } else {
-                // Username/password salah - tidak perlu alert tambahan
-                // Karena sudah ada di validateLogin()
-            }
-        }
-        function logout() {
-            if (!confirm('Yakin logout?')) return;
-
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-
-            // ========== HAPUS SEMUA DATA SAAT LOGOUT ==========
-            if (currentUser) {
-                localStorage.removeItem('appData_' + currentUser.username);
-            }
-            localStorage.removeItem('appDataTable'); // ← Hapus juga backup lama
-            // ================================================
-
-            dataTable = [];
-            allDataTable = [];
-            // ==============================================
-
-            localStorage.removeItem('currentUser');
-
-            // Update kode verifikasi
+            
+            // Reset kode
             kodeVerifikasiGlobal = generateKodeVerifikasi();
-            document.getElementById('kodeDisplay').textContent = kodeVerifikasiGlobal;
-            document.getElementById('kodeVerif').value = '';
-
-            // Reset UI
-            document.getElementById('appContainer').style.display = 'none';
-            document.getElementById('loginContainer').style.display = 'flex';
-            document.getElementById('loginForm').reset();
-            document.getElementById('userManagementBtn')?.remove();
-            document.getElementById('userManagementModal')?.remove();
-
-            renderTable();
-            document.body.classList.add('login-bg');
-        }
-        setInterval(saveAppData, 30000);
-        function loadAppData() {
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-
-            if (!currentUser) return;
-
-            // SuperAdmin tidak punya data aplikasi sendiri
-            if (currentUser.username === 'SUPERADMIN') {
-                console.log('📊 SuperAdmin - Tidak memuat data');
-                return;
-            }
-
-            // 🔄 PERBAIKAN: Muat data dari localStorage
-            const savedData = localStorage.getItem('appData_' + currentUser.username);
-            if (savedData) {
-                allDataTable = JSON.parse(savedData);
-                console.log('📊 Data dimuat:', allDataTable.length, 'record');
-            } else {
-                allDataTable = [];
-                console.log('📊 Tabel kosong - siap untuk import JSON');
-            }
-
-            applySearchAndSort();
-        }
+            document.getElementById('loginBtn').classList.remove('login-loading');
+            
+            console.log('✅ Login berhasil dengan Firebase!');
+          } else {
+            // User belum ada di database → buat baru
+            db.collection('users').doc(user.uid).set({
+              username: username.toUpperCase(),
+              nama: username.toUpperCase(),
+              role: 'user',
+              createdAt: new Date().toISOString(),
+              active: true
+            });
+            
+            alert('User baru dibuat! Selamat datang ' + username.toUpperCase());
+            
+            // Reload
+            location.reload();
+          }
+        })
+        .catch((error) => {
+          console.error('Error get user:', error);
+          alert('Error: ' + error.message);
+          document.getElementById('loginBtn').classList.remove('login-loading');
+        });
+    })
+    .catch((error) => {
+      console.error('Login error:', error);
+      document.getElementById('loginBtn').classList.remove('login-loading');
+      
+      if (error.code === 'auth/user-not-found') {
+        alert('User belum terdaftar! Hubungi administrator.');
+      } else if (error.code === 'auth/wrong-password') {
+        alert('Password SALAH!');
+      } else if (error.code === 'auth/invalid-email') {
+        alert('Username tidak valid!');
+      } else {
+        alert('Login gagal: ' + error.message);
+      }
+    });
+}
+        function logout() {
+  if (!confirm('Yakin logout?')) return;
+  
+  // Simpan dulu sebelum logout
+  saveAppData();
+  
+  // Logout dari Firebase
+  auth.signOut()
+    .then(() => {
+      console.log('✅ Logout berhasil');
+      
+      // Clear local
+      dataTable = [];
+      allDataTable = [];
+      localStorage.removeItem('currentUser');
+      
+      // Reset kode
+      kodeVerifikasiGlobal = generateKodeVerifikasi();
+      document.getElementById('kodeDisplay').textContent = kodeVerifikasiGlobal;
+      document.getElementById('kodeVerif').value = '';
+      
+      // Reset UI
+      document.getElementById('appContainer').style.display = 'none';
+      document.getElementById('loginContainer').style.display = 'flex';
+      document.getElementById('loginForm').reset();
+      document.getElementById('userManagementBtn')?.remove();
+      document.getElementById('userManagementModal')?.remove();
+      
+      renderTable();
+      document.body.classList.add('login-bg');
+    })
+    .catch((error) => {
+      console.error('Logout error:', error);
+    });
+}
         function updateDateTime() {
             const now = new Date();
             const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
@@ -334,67 +356,138 @@ function generateKodeVerifikasi() {
         let currentPage = 1;
         const rowsPerPage = 50;
         function saveAppData() {
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-
-            // SuperAdmin tidak menyimpan data
-            if (!currentUser || currentUser.username === 'SUPERADMIN') return;
-
-            localStorage.setItem('appData_' + currentUser.username, JSON.stringify(allDataTable));
-        }
+  const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+  
+  // SuperAdmin tidak menyimpan data
+  if (!currentUser || currentUser.role === 'superadmin') return;
+  
+  // Batch write untuk efisiensi
+  const batch = db.batch();
+  
+  // Hapus semua data lama dulu
+  db.collection('users').doc(currentUser.uid).collection('data')
+    .get()
+    .then((querySnapshot) => {
+      // Delete each
+      querySnapshot.forEach((doc) => {
+        batch.delete(db.collection('users').doc(currentUser.uid).collection('data').doc(doc.id));
+      });
+      
+      // Insert semua data baru
+      allDataTable.forEach((data, index) => {
+        const docRef = db.collection('users').doc(currentUser.uid).collection('data').doc('data_' + index);
+        batch.set(docRef, data);
+      });
+      
+      // Execute batch
+      return batch.commit();
+    })
+    .then(() => {
+      console.log('✅ Data disimpan ke Firebase:', allDataTable.length, 'record');
+      
+      // Backup ke localStorage juga (cadangan)
+      localStorage.setItem('appDataBackup_' + currentUser.username, JSON.stringify(allDataTable));
+    })
+    .catch((error) => {
+      console.error('Error save data:', error);
+      // Fallback ke localStorage
+      localStorage.setItem('appData_' + currentUser.username, JSON.stringify(allDataTable));
+    });
+}
         function clearForm() {
             document.getElementById('dataForm').reset();
         }
         async function addData() {
-            const photoFile = document.getElementById('photoInput').files[0];
-            const name = document.getElementById('name').value.trim();
-            const passport = document.getElementById('passport').value.trim();
-            const debtRpRaw = document.getElementById('debtRp').value.trim();
-            const debtRmRaw = document.getElementById('debtRm').value.trim();
-            const debtBosRaw = document.getElementById('debtBos').value.trim();
-            const statusBayar = document.getElementById('statusBayar').value;
-            const tanggalMasuk = document.getElementById('tanggalMasuk').value;
-            const tujuan = document.getElementById('tujuan').value;
-            const keterangan = document.getElementById('keterangan').value.trim();
-
-            if (!name || !passport || !tanggalMasuk || !tujuan || !statusBayar) {
-                alert('Semua kolom wajib diisi kecuali Hutang dan Keterangan.');
-                return;
-            }
-
-            const debtRp = parseFloat(debtRpRaw.replace(/[^\d.-]/g, '')) || 0;
-            const debtRm = parseFloat(debtRmRaw.replace(/[^\d.-]/g, '')) || 0;
-            const debtBos = parseFloat(debtBosRaw.replace(/[^\d.-]/g, '')) || 0;
-
-            let photoBase64 = '';
-
-            if (photoFile) {
-                photoBase64 = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result);
-                    reader.readAsDataURL(photoFile);
-                });
-            }
-
-            const tanggalLahir = document.getElementById('tanggalLahir').value;
-
-            const newData = {
-                name,
-                passport,
-                debtRp,
-                debtRm,
-                debtBos,
-                statusBayar,
-                tanggalMasuk,
-                tujuan,
-                keterangan,
-                tanggalLahir: tanggalLahir || '', // ← TAMBAHKAN
-                photo: photoBase64
-            };
-
-            allDataTable.push(newData);
-            applySearchAndSort();
-            clearForm();
-        }
+  const photoFile = document.getElementById('photoInput').files[0];
+  const name = document.getElementById('name').value.trim();
+  const passport = document.getElementById('passport').value.trim();
+  const debtRpRaw = document.getElementById('debtRp').value.trim();
+  const debtRmRaw = document.getElementById('debtRm').value.trim();
+  const debtBosRaw = document.getElementById('debtBos').value.trim();
+  const statusBayar = document.getElementById('statusBayar').value;
+  const tanggalMasuk = document.getElementById('tanggalMasuk').value;
+  const tujuan = document.getElementById('tujuan').value;
+  const keterangan = document.getElementById('keterangan').value.trim();
+  const tanggalLahir = document.getElementById('tanggalLahir').value;
+  
+  if (!name || !passport || !tanggalMasuk || !tujuan || !statusBayar) {
+    alert('Semua kolom wajib diisi kecuali Hutang dan Keterangan.');
+    return;
+  }
+  
+  const debtRp = parseFloat(debtRpRaw.replace(/[^\d.-]/g, '')) || 0;
+  const debtRm = parseFloat(debtRmRaw.replace(/[^\d.-]/g, '')) || 0;
+  const debtBos = parseFloat(debtBosRaw.replace(/[^\d.-]/g, '')) || 0;
+  
+  let photoBase64 = '';
+  if (photoFile) {
+    photoBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(photoFile);
+    });
+  }
+  
+  const newData = {
+    name,
+    passport,
+    debtRp,
+    debtRm,
+    debtBos,
+    statusBayar,
+    tanggalMasuk,
+    tujuan,
+    keterangan,
+    tanggalLahir: tanggalLahir || '',
+    photo: photoBase64,
+    createdAt: new Date().toISOString()
+  };
+  
+  // Tambah ke array lokal
+  allDataTable.push(newData);
+  applySearchAndSort();
+  clearForm();
+  
+  //langsung simpan ke Firebase
+  saveAppData();
+  
+  console.log('✅ Data ditambahkan & disimpan ke Firebase!');
+}
+// ========== LOAD APP DATA (FIREBASE) ==========
+function loadAppData() {
+  const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+  
+  if (!currentUser) {
+    console.log('❌ Belum login');
+    return;
+  }
+  
+  if (currentUser.role === 'superadmin') {
+    console.log('📊 SuperAdmin - Tidak memuat data aplikasi');
+    allDataTable = [];
+    applySearchAndSort();
+    return;
+  }
+  
+  // Load dari Firestore
+  db.collection('users').doc(currentUser.uid).collection('data')
+    .get()
+    .then((querySnapshot) => {
+      allDataTable = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        data.id = doc.id;
+        allDataTable.push(data);
+      });
+      
+      console.log('📊 Data dimuat dari Firebase:', allDataTable.length, 'record');
+      applySearchAndSort();
+    })
+    .catch((error) => {
+      console.error('Error load data:', error);
+    });
+}
+setInterval(saveAppData, 10000);
         function editData(index) {
             if (index < 0 || index >= dataTable.length) return;
             const data = dataTable[index];
