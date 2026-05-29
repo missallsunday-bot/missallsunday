@@ -1,4 +1,3 @@
-
 function generateKodeVerifikasi() {
         return Math.floor(10000 + Math.random() * 90000).toString();
     }
@@ -29,14 +28,38 @@ function escapeHtml(text) {
       });
     }
 function formatDate(dateString) {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      if (isNaN(date)) return '';
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-      return `${day}-${month}-${year}`;
-    }
+  if (!dateString) return '';
+  
+  // Coba parce tanggal
+  let date;
+  
+  // Format sudah YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    date = new Date(dateString);
+  } 
+  // Format DD-MM-YYYY
+  else if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
+    const parts = dateString.split('-');
+    date = new Date(parts[2], parts[1] - 1, parts[0]);
+  }
+  // Format DD/MM/YYYY
+  else if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+    const parts = dateString.split('/');
+    date = new Date(parts[2], parts[1] - 1, parts[0]);
+  }
+  else {
+    // Coba langsung parc
+    date = new Date(dateString);
+  }
+  
+  if (isNaN(date)) return dateString; // Kembalikan apa adanya kalo gagal
+  
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  
+  return `${day}-${month}-${year}`;
+}
 function normalize(text) {
   if (!text) return '';
   return text
@@ -2195,4 +2218,29 @@ async function autoProcessPDF() {
     btn.disabled = false;
     document.getElementById('pdfUpload').value = '';
   }
+}
+function formatTanggalLahir(input) {
+  // Hapus karakter non-angka
+  let value = input.value.replace(/[^\d]/g, '');
+  
+  // Format automatis: DD-MM-YYYY
+  if (value.length > 2) {
+    value = value.substring(0,2) + '-' + value.substring(2);
+  }
+  if (value.length > 5) {
+    value = value.substring(0,5) + '-' + value.substring(5,9);
+  }
+  
+  // Batasi max 10 karakter (DD-MM-YYYY)
+  input.value = value.substring(0, 10);
+}
+function setTanggalLahirFromPicker(dateValue) {
+  if (!dateValue) return;
+  
+  // Ubah format YYYY-MM-DD menjadi DD-MM-YYYY untuk tampilan
+  const parts = dateValue.split('-');
+  const formatted = parts[2] + '-' + parts[1] + '-' + parts[0];
+  
+  // Set ke input teks
+  document.getElementById('tanggalLahir').value = formatted;
 }
