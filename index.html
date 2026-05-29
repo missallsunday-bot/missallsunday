@@ -112,18 +112,35 @@
     </div>
   </div>
   <div class="grid grid-cols-2 gap-4">
-    <div>
-      <label class="text-xs font-bold text-blue-700 block mb-1 ml-1">🎂 TANGGAL LAHIR</label>
-      <div class="relative" style="display:flex; align-items:center; width:100%;">
-        <input class="p-3 rounded-xl border border-blue-200 bg-white/80 text-slate-900 focus:ring-4 focus:ring-blue-600 w-full" id="tanggalLahir" type="date"/>
-    </div>
-    </div>
-    <div>
-      <label class="text-xs font-bold text-blue-700 block mb-1 ml-1">📝 KETERANGAN</label>
-      <input class="p-3 rounded-xl border border-blue-200 bg-white/80 text-slate-900 focus:ring-4 focus:ring-blue-600 w-full" id="keterangan" placeholder="Masukan Keterangan" type="text"/>
-    </div>
-  </div>
   <div>
+  <label class="text-xs font-bold text-blue-700 block mb-1 ml-1">🎂 TANGGAL LAHIR</label>
+  <div class="relative" style="display:flex; align-items:center; width:100%;">
+    <!-- Input teks yang bisa copy-paste -->
+    <input 
+  class="p-3 rounded-xl border border-blue-200 bg-white/80 text-slate-900 focus:ring-4 focus:ring-blue-600 w-full" 
+  id="tanggalLahir" 
+  type="text"
+  placeholder="dd-mm-yyyy"
+  oninput="formatTanggalLahir(this)"
+  style="padding-right: 40px;"
+/>
+    <!-- Icon kalender yang bisa diklik untuk cari manual -->
+    <i class="fas fa-calendar-alt" 
+       style="position: absolute; right: 12px; color: #94a3b8; cursor: pointer;"
+       onclick="document.getElementById('tanggalLahirDate').showPicker()"
+    ></i>
+    <!-- Input date tersembunyi untuk fungsi showPicker() -->
+    <input type="date" id="tanggalLahirDate" 
+           style="position: absolute; visibility: hidden;" 
+           onchange="setTanggalLahirFromPicker(this.value)"
+    />
+  </div>
+</div>
+  <div>
+    <label class="text-xs font-bold text-blue-700 block mb-1 ml-1">📝 KETERANGAN</label>
+    <input class="p-3 rounded-xl border border-blue-200 bg-white/80 text-slate-900 focus:ring-4 focus:ring-blue-600 w-full" id="keterangan" placeholder="Masukan Keterangan" type="text"/>
+  </div>
+</div>
     <label class="text-xs font-bold text-blue-700 block mb-1 ml-1">📷 TAMBAHKAN FOTO</label>
     <input type="file" id="photoInput" accept="image/*" class="p-3 rounded-xl border border-blue-200 bg-white/80 text-slate-900 w-full"/>
   </div>
